@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 small = 1e-9
 
 # Variable Parameters
-k = 3.1  # Young's modulus for PLA plastic
+k = 2  # Young's modulus for PLA plastic
 arr_size = 10  # 10x10 matrix
 
 # Constraints
-vol = 10 * 10
-vol_ratio = 1.7
+vol = arr_size**2
+vol_ratio = 0.7
 
 # If generating a matrix using random numbers, eplace 0s with the "small" value in order to avoid numerical complexities
 
@@ -21,6 +21,7 @@ def clean_arr(matrix):
         for j in range(len(matrix[i])):
             if matrix[i][j] == 0:
                 matrix[i][j] = small
+
 
 # Note that while hookes law uses a negative constant of porportionality for force, in order to optimize stress,
 # young's modulus is kept positive
@@ -32,9 +33,10 @@ def hookes_law(matrix):
     for i in range(arr_size):
         for j in range(arr_size):
             # Applies stress to the top of the matrix (starting from row 0)
-            stress[i][j] = k * matrix[i*j] * i
+            stress[i][j] = k * matrix[[i * j]] * i
 
     return stress
+
 
 # Similar to linear programming in math, the objective function is the function that is minimized.
 # In this case, the objective function is the sum of the stress matrix, which we are trying to minimize
@@ -43,30 +45,33 @@ def hookes_law(matrix):
 def objective_func(matrix):
     return np.sum(hookes_law(matrix))
 
+
 # Function to calculate the constraint equation
 
 
 def constraint(densities):
-    return vol_ratio * np.sum(densities) - vol
+    used_volume = np.sum(densities)
+
+    return (used_volume / vol) - vol_ratio
+
 
 # Gradient-based approach to decrease material densities (using scipy to take care of the math)
 
 
 def optimize_densities(matrix):
-    n = matrix.shape[0] * matrix.shape[1]  # 100
-
     initial_guess = matrix.flatten()
 
-    bounds = [(0, 1)] * n
-    # Use 'ineq' for inequality constraint
-    constraints = {'type': 'ineq', 'fun': constraint}
+    bounds = [(0, 1)] * vol
+    constraints = [{"type": "eq", "fun": constraint}]
 
-    result = minimize(objective_func, initial_guess,
-                      bounds=bounds, constraints=constraints)
+    result = minimize(
+        objective_func, initial_guess, bounds=bounds, constraints=constraints
+    )
 
     optimized_densities = result.x.reshape(matrix.shape)
 
     return optimized_densities
+
 
 # Solid Isotropic Material with Penalisation (SIMP) method
 # This essentially converts the optimized densities into a binary matrix (which is easier to plot and visualize)
@@ -92,7 +97,7 @@ optimized_densities = optimize_densities(arr)
 result_matrix = simp_method(optimized_densities)
 
 # Plotting the results
-plt.style.use('classic')
-plt.contour(result_matrix)
+plt.style.use("classic")
+plt.contourf(result_matrix)
 plt.colorbar()
 plt.show()
